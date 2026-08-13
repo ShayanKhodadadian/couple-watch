@@ -1,12 +1,16 @@
 import React, { useState } from "react";
+import { HTTP_URL, PROXY_KEY } from "../config.js";
 
-// نکته‌ی مهم: چون این نسخه کاملا رایگان و بدون کارت بانکی روی Cloudflare
-// Workers اجرا می‌شه، سرور جایی برای ذخیره‌ی دائمیِ فایل ویدیو نداره (سرویس
-// آبجکت‌استوریج Cloudflare یعنی R2، حتی توی پلن رایگانش هم اضافه کردن کارت
-// بانکی رو لازم داره). به همین خاطر راه پخش، دادن «لینک مستقیم» به یه فایل
-// ویدیوئه، نه آپلود روی این سرور. لینک می‌تونه از هرجایی باشه: یه فایل mp4
-// که جایی آپلودش کردی (مثلا Google Drive با لینک مستقیم، یا هر هاست رایگان
-// دیگه) یا یه استریم m3u8.
+// همه‌ی لینک‌ها (لینک مستقیم mp4/m3u8، یا لینک اشتراک‌گذاری گوگل درایو با هر
+// فرمتی) از این تابع رد می‌شن و به یه لینک /video-proxy روی خود Worker
+// تبدیل می‌شن. چون پخش و بافت سه‌بعدی هر دو از همین لینک استفاده می‌کنن،
+// دیگه فرقی نمی‌کنه سرور اصلی ویدیو هدر CORS بده یا نه — مرورگر فقط با
+// Worker خودمون حرف می‌زنه که همیشه هدرش رو درست می‌ده.
+function toProxied(rawUrl) {
+  const params = new URLSearchParams({ url: rawUrl });
+  if (PROXY_KEY) params.set("key", PROXY_KEY);
+  return `${HTTP_URL}/video-proxy?${params.toString()}`;
+}
 
 export default function UploadPanel({ onClose, onSetSource }) {
   const [url, setUrl] = useState("");
@@ -24,12 +28,13 @@ export default function UploadPanel({ onClose, onSetSource }) {
       // هیچ کنترلی روش نداره — نه پلی/پاز، نه سیک، نه سینک.
       window.location.href = trimmed;
       setError(
-        "لینک vlc:// یه برنامه‌ی جدا رو باز می‌کنه که مرورگر کنترلی روش نداره، پس این حالت قابل سینک‌شدن نیست. برای پخش سینک، یه لینک مستقیم mp4/webm/m3u8 بده."
+        "لینک vlc:// یه برنامه‌ی جدا رو باز می‌کنه که مرورگر کنترلی روش نداره، پس این حالت قابل سینک‌شدن نیست. یه لینک مستقیم یا لینک گوگل‌درایو بده."
       );
       return;
     }
 
-    onSetSource({ url: trimmed, kind: "url", name: trimmed });
+    const proxiedUrl = toProxied(trimmed);
+    onSetSource({ url: proxiedUrl, kind: "url", name: trimmed });
     onClose();
   }
 
@@ -45,7 +50,7 @@ export default function UploadPanel({ onClose, onSetSource }) {
           <input
             type="text"
             autoFocus
-            placeholder="لینک مستقیم ویدیو (mp4, webm, m3u8...)"
+            placeholder="لینک گوگل‌درایو، یا هر لینک مستقیم ویدیو (mp4, webm, m3u8...)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
@@ -59,21 +64,30 @@ export default function UploadPanel({ onClose, onSetSource }) {
           className="modal-help-toggle"
           onClick={() => setShowHelp((s) => !s)}
         >
-          {showHelp ? "بستن راهنما ▲" : "لینک مستقیم از کجا بیارم؟ ▼"}
+          {showHelp ? "بستن راهنما ▲" : "چه لینکی جواب می‌ده؟ ▼"}
         </button>
 
         {showHelp && (
           <div className="modal-help">
             <p>
-              این سایت روی Cloudflare Workers رایگان اجراست، پس خودش جایی
-              برای ذخیره‌ی فایل ویدیو نداره — فقط پخش رو بین دو نفر سینک
-              می‌کنه. باید یه لینک مستقیم بهش بدی:
+              دیگه لازم نیست خودت لینک رو دستی تبدیل کنی — همه‌ی لینک‌ها از
+              یه واسطه (Worker خودمون) رد می‌شن که هم مشکل CORS رو حل می‌کنه
+              هم لینک گوگل‌درایو رو خودش به فرمت قابل‌پخش تبدیل می‌کنه:
             </p>
             <ul>
-              <li>یه فایل روی Google Drive آپلود کن، Share → Anyone with link، بعد آیدی فایل رو از لینکش بردار و توی این قالب بذار: <code>https://drive.google.com/uc?export=download&id=FILE_ID</code></li>
-              <li>یا از یه هاست ویدیوی رایگان که لینک مستقیم mp4 می‌ده استفاده کن</li>
-              <li>یا اگه فیلم از قبل یه لینک استریم (m3u8) داره، همون رو بده</li>
+              <li>
+                لینک اشتراک‌گذاری گوگل‌درایو رو همون‌طوری که Share می‌ده
+                بچسبون، مثلاً:{" "}
+                <code>https://drive.google.com/file/d/FILE_ID/view?usp=sharing</code>
+              </li>
+              <li>یا هر لینک مستقیم mp4/webm</li>
+              <li>یا یه لینک استریم m3u8</li>
             </ul>
+            <p>
+              نکته‌ی گوگل‌درایو: برای فایل‌های خیلی حجیم، خود گوگل گاهی
+              محدودیت دانلود روزانه می‌ذاره؛ اگه یه لینک درایو ناگهان از کار
+              افتاد، چند ساعت بعد یا فردا دوباره امتحان کن.
+            </p>
           </div>
         )}
       </div>

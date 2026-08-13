@@ -3,5 +3,14 @@
 // برای توسعه‌ی محلی، پیش‌فرض به wrangler dev (پورت 8787) وصل می‌شه.
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
 
+// آدرس http(s) خام Worker — برای ساختن لینک‌های /video-proxy لازمه.
+export const HTTP_URL = WORKER_URL.replace(/\/+$/, "");
+
 // http(s) -> ws(s) و اضافه کردن مسیر /ws که Durable Object بهش گوش می‌ده
-export const WS_URL = WORKER_URL.replace(/^http/, "ws").replace(/\/+$/, "") + "/ws";
+export const WS_URL = HTTP_URL.replace(/^http/, "ws") + "/ws";
+
+// اگه PROXY_KEY رو موقع build ست کنی (باید دقیقاً همون مقدار PROXY_KEY که
+// روی خود Worker (wrangler.toml یا secret) گذاشتی باشه)، به همه‌ی لینک‌های
+// video-proxy اضافه می‌شه — یه لایه‌ی سبک جلوگیری از سوءاستفاده‌ی غریبه‌ها
+// از این endpoint عمومی. اختیاریه؛ اگه ست نکنی، proxy برای همه باز می‌مونه.
+export const PROXY_KEY = import.meta.env.VITE_PROXY_KEY || "";

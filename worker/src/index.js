@@ -40,7 +40,16 @@ function extractDriveId(rawUrl) {
 }
 
 function fetchUpstream(url, range) {
-  const headers = {};
+  const headers = {
+    // Lots of direct-download CDNs (common on Persian film-sharing sites)
+    // reject requests with no Referer/User-Agent as hotlinking/bot traffic.
+    // Sending a normal-looking browser identity, and a Referer pointing at
+    // the file's own domain, is enough to pass most of these checks —
+    // it's exactly what a real browser tab opened on that link would send.
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    "Referer": new URL(url).origin + "/",
+    "Accept": "*/*",
+  };
   if (range) headers["Range"] = range;
   return fetch(url, { headers, redirect: "follow" });
 }
@@ -102,10 +111,15 @@ async function handleVideoProxy(request, env) {
     const v = upstream.headers.get(h);
     if (v) headers.set(h, v);
   }
-  // Drive sometimes mislabels the response; force a sane video type if it
-  // looks wrong so the <video> element doesn't refuse to play it.
+  // Some CDNs send no useful Content-Type (application/octet-stream, or an
+  // HTML error page). Guess from the file extension so the <video> element
+  // has a real hint about what it's dealing with.
   const ct = headers.get("content-type") || "";
-  if (!ct || ct.includes("text/html")) headers.set("content-type", "video/mp4");
+  if (!ct || ct.includes("text/html") || ct === "application/octet-stream") {
+    const ext = (target.split("?")[0].split(".").pop() || "").toLowerCase();
+    const byExt = { mkv: "video/x-matroska", mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", m3u8: "application/vnd.apple.mpegurl" };
+    headers.set("content-type", byExt[ext] || "video/mp4");
+  }
   if (!headers.get("accept-ranges")) headers.set("accept-ranges", "bytes");
 
   return new Response(upstream.body, { status: upstream.status, headers });

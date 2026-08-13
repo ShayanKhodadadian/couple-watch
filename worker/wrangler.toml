@@ -1,0 +1,16 @@
+name = "couple-watch-party"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# اجازه‌ی اتصال از هر دامنه‌ای (فرانت‌اند روی GitHub Pages می‌شینه، این روی
+# Cloudflare Workers — CORS رو خود index.js هندل می‌کنه)
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomDO"
+
+# مهم: new_sqlite_classes باعث می‌شه Durable Object با بک‌اند SQLite ساخته بشه،
+# که تنها نوعیه که روی پلن رایگان Workers (بدون کارت بانکی) قابل استفاده‌ست.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDO"]
